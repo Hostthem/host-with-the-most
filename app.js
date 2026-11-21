@@ -89,6 +89,40 @@ class CheckoutValidator {
   }
 }
 
+/* ---------- Gallery (real events) ---------- */
+class MediaItem {
+  constructor(type, src, caption) { Object.assign(this, {type, src, caption}); }
+  html() {
+    const media = this.type === 'video'
+      ? `<video src='${this.src}#t=0.1' controls playsinline preload='metadata'></video>`
+      : `<img src='${this.src}' alt='${esc(this.caption)}' loading='lazy'>`;
+    return `<figure class='shot'>${media}<figcaption>${esc(this.caption)}</figcaption></figure>`;
+  }
+}
+class Gallery {
+  constructor() {
+    // Upload new photos or videos to the repository, then add a line here.
+    this.items = [
+      new MediaItem('photo', 'activity-1.jpg', 'Our hostess greeting guests at an evening outdoor event.'),
+      new MediaItem('video', 'activity-2.mp4', 'The team in branded tees working the crowd at a night fair.'),
+      new MediaItem('video', 'activity-3.mp4', 'Bringing the energy between the stalls.')
+    ];
+  }
+  html(limit) {
+    const list = limit ? this.items.slice(0, limit) : this.items;
+    return `<div class='shots'>${list.map(i => i.html()).join('')}</div>`;
+  }
+  // Hide any item whose file is missing; show a note if none can load.
+  static prune(el) {
+    el.addEventListener('error', e => {
+      const f = e.target.closest && e.target.closest('figure.shot');
+      if (!f) return;
+      f.remove();
+      if (!el.querySelector('figure.shot')) el.querySelectorAll('.shots').forEach(s => s.insertAdjacentHTML('afterend', `<p class='muted'>Photos and videos are coming soon.</p>`));
+    }, true);
+  }
+}
+
 /* ---------- Views ---------- */
 class View {
   constructor(app) { this.app = app; }
@@ -96,6 +130,7 @@ class View {
   mount(el) {}
 }
 class HomeView extends View {
+  mount(el) { Gallery.prune(el); }
   html() {
     const a = this.app;
     return `<div class='hero'><div class='wrap'><p class='tag'>Your Event Our Passion</p><h1>Every great event starts with a great welcome.</h1>
@@ -103,7 +138,7 @@ class HomeView extends View {
 <a class='btn' href='#book'>Book your staff</a><a class='btn alt' href='#services'>See services</a><a class='btn wa' href='https://wa.me/${WA}' target='_blank' rel='noopener'>Chat on WhatsApp</a></div></div>
 <section><div class='wrap'><h2>What we do</h2><div class='grid'>${a.catalog.items.map(s => `<div class='card'><div class='ic'>${s.icon}</div><h3>${s.name}</h3><p class='muted'>${s.desc}</p><div class='price'>from ${money(s.rate)} / day</div></div>`).join('')}</div></div></section>
 <section class='alt-bg'><div class='wrap'><div class='stats'><div><b>500+</b>events staffed</div><div><b>10 to 200</b>team sizes</div><div><b>24h</b>quote response</div></div></div></section>
-<section><div class='wrap'><h2>Kind words</h2><div class='grid'>${a.testimonials.map(t => `<div class='card'><p class='quote'>“${t.q}”</p><p class='who'>${t.n}</p></div>`).join('')}</div></div></section>`;
+<section><div class='wrap'><h2>Real events, real moments</h2><p class='muted'>Photos and videos from events our team has worked.</p>${new Gallery().html()}<p style='margin-top:24px'><a class='btn' href='#experiences'>See all experiences</a></p></div></section>`;
   }
 }
 class AboutView extends View {
@@ -218,6 +253,13 @@ class ConfirmView extends View {
 ${WA_LINES.map((l, i) => `<a class='btn wa' style='margin:4px' href='${esc(waLink(o.message, i))}' target='_blank' rel='noopener'>Send to ${l.display}</a>`).join('')} <a class='btn alt' href='#home'>Back home</a></div></section>`;
   }
 }
+class ExperiencesView extends View {
+  mount(el) { Gallery.prune(el); }
+  html() {
+    return `<section><div class='wrap'><h1>Experiences & activities</h1><p class='muted'>Real moments from events our team has worked. This is how we show up.</p>${new Gallery().html()}
+<p style='margin-top:28px'><a class='btn' href='#book'>Book your staff</a> <a class='btn wa' href='https://wa.me/${WA}' target='_blank' rel='noopener'>Chat on WhatsApp</a></p></div></section>`;
+  }
+}
 class FaqView extends View {
   html() {
     const q = [['How far ahead should I book?', 'Two weeks is ideal. For large events or peak season, book a month ahead. Last-minute requests are welcome and handled as availability allows.'],
@@ -272,9 +314,9 @@ class App {
       {q: 'Our conference check-in was seamless. Guests kept asking where we found such a polished team.', n: 'Corporate client, Douala'},
       {q: 'They made our wedding feel effortless. Warm, punctual and beautifully turned out.', n: 'Wedding client, Buea'},
       {q: 'Professional from the first call to the last guest. We will book again.', n: 'Product launch organiser, Yaoundé'}];
-    this.nav = {home: 'Home', about: 'About', services: 'Services', book: 'Book', faq: 'FAQ', contact: 'Contact'};
-    this.titles = {home: 'Home', about: 'About', services: 'Services', book: 'Book', checkout: 'Checkout', confirmation: 'Booking confirmed', faq: 'FAQ', contact: 'Contact'};
-    const views = {home: HomeView, about: AboutView, services: ServicesView, book: BookView, checkout: CheckoutView, confirmation: ConfirmView, faq: FaqView, contact: ContactView};
+    this.nav = {home: 'Home', about: 'About', services: 'Services', experiences: 'Experiences', book: 'Book', faq: 'FAQ', contact: 'Contact'};
+    this.titles = {home: 'Home', about: 'About', services: 'Services', experiences: 'Experiences', book: 'Book', checkout: 'Checkout', confirmation: 'Booking confirmed', faq: 'FAQ', contact: 'Contact'};
+    const views = {home: HomeView, about: AboutView, services: ServicesView, book: BookView, checkout: CheckoutView, confirmation: ConfirmView, faq: FaqView, contact: ContactView, experiences: ExperiencesView};
     this.router = new Router(views, r => { this.route = r; this.render(); scrollTo(0, 0); });
     this.route = this.router.current(); this.render();
   }
