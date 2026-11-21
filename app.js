@@ -1,9 +1,13 @@
 'use strict';
-const WA = '237679672445';
+const WA_LINES = [
+  {number: '237679672445', display: '+237 679 672 445'},
+  {number: '237652776492', display: '+237 652 776 492'}
+];
+const WA = WA_LINES[0].number;
 const money = n => new Intl.NumberFormat('en-US').format(Math.round(n)) + ' FRS';
 const esc = s => String(s).replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])).split(String.fromCharCode(39)).join('&#39;').split(String.fromCharCode(34)).join('&quot;');
 const digits = s => String(s).replace(/[^0-9]/g, '');
-const waLink = t => 'https://wa.me/' + WA + '?text=' + encodeURIComponent(t);
+const waLink = (t, i = 0) => 'https://wa.me/' + WA_LINES[i].number + '?text=' + encodeURIComponent(t);
 const NL = String.fromCharCode(10);
 
 /* ---------- Domain models ---------- */
@@ -166,6 +170,7 @@ class CheckoutView extends View {
 <label for='txid'>MoMo transaction ID</label><input id='txid' placeholder='From your confirmation SMS'>${err('txid')}</div>
 </div><div class='card'><h3>Order summary</h3>${new BookView(this.app).summary(c)}
 <div class='row'><span class='muted'>Deposit due now (50%)</span><span>${money(c.total / 2)}</span></div>
+<label for='waline'>Send booking details to</label><select id='waline'>${WA_LINES.map((l, i) => `<option value='${i}'>${l.display}</option>`).join('')}</select>
 <label class='chk'><input type='checkbox' id='terms'> I accept the booking terms and cancellation policy.</label>${err('terms')}${err('cart')}
 <button class='btn' type='submit' style='width:100%'>Place booking request</button>
 <p class='muted' style='font-size:.85rem'>Your booking details open in WhatsApp so they reach us instantly. We verify your payment and confirm within 24 hours.</p></div></form></div></section>`;
@@ -196,7 +201,8 @@ class CheckoutView extends View {
       if (Object.keys(errs).length) { const first = form.querySelector('.err:not(:empty)'); if (first) first.scrollIntoView({block: 'center'}); return; }
       app.lastOrder = new Order(app.cart, d);
       const all = app.store.get('hwtm-orders', []); all.push(app.lastOrder); app.store.set('hwtm-orders', all);
-      window.open(waLink(app.lastOrder.message), '_blank', 'noopener');
+      app.lastOrder.line = +form.querySelector('#waline').value;
+      window.open(waLink(app.lastOrder.message, app.lastOrder.line), '_blank', 'noopener');
       app.cart.clear(); location.hash = 'confirmation';
     };
   }
@@ -207,9 +213,9 @@ class ConfirmView extends View {
     if (!o) return `<section><div class='wrap ok'><h2>No recent booking</h2><a class='btn' href='#book'>Start a booking</a></div></section>`;
     return `<section><div class='wrap ok'><div style='font-size:3rem'>🎉</div><h1>Thank you, ${esc(o.details.name.split(' ')[0])}!</h1>
 <p>Your booking request is ready. Reference:</p><div class='ref'>${o.ref}</div>
-<p class='muted'>If WhatsApp did not open, tap the green button to send us your booking. We verify your payment and confirm within 24 hours.</p>
+<p class='muted'>If WhatsApp did not open, tap a green button below to send us your booking. We verify your payment and confirm within 24 hours.</p>
 <div class='card' style='max-width:460px;margin:24px auto;text-align:left'>${o.entries.map(e => `<div class='row'><span>${e.qty} × ${e.s.name}</span><span>${money(e.total)}</span></div>`).join('')}<div class='row total'><span>Total</span><span>${money(o.total)}</span></div></div>
-<a class='btn wa' href='${waLink(o.message)}' target='_blank' rel='noopener'>Send booking on WhatsApp</a> <a class='btn alt' href='#home'>Back home</a></div></section>`;
+${WA_LINES.map((l, i) => `<a class='btn wa' style='margin:4px' href='${esc(waLink(o.message, i))}' target='_blank' rel='noopener'>Send to ${l.display}</a>`).join('')} <a class='btn alt' href='#home'>Back home</a></div></section>`;
   }
 }
 class FaqView extends View {
@@ -223,22 +229,30 @@ class FaqView extends View {
   }
 }
 class ContactView extends View {
+  buttons(text, prefix) {
+    return WA_LINES.map((l, i) => `<a class='btn wa' style='margin:4px 8px 4px 0' href='${esc(waLink(text, i))}' target='_blank' rel='noopener'>${prefix} ${l.display}</a>`).join('');
+  }
   html() {
-    return `<section><div class='wrap'><div class='split'><div><h1>Contact us</h1><p class='muted'>Planning something special? Tell us about it and we will reply within 24 hours.</p>
-<div class='row'><span>Phone / WhatsApp</span><a href='tel:+237679672445'>+237 679 672 445</a></div><div class='row'><span>Phone / WhatsApp</span><a href='tel:+237652776492'>+237 652 776 492</a></div><div class='row'><span>Based in</span><span>Buea, Cameroon</span></div>
-<p><a class='btn wa' href='https://wa.me/${WA}' target='_blank' rel='noopener'>Chat on WhatsApp</a></p></div>
-<form id='cf' class='card' novalidate><label for='cn'>Name</label><input id='cn'><label for='cp'>Phone / WhatsApp</label><input id='cp' type='tel'><label for='cm'>Message</label><textarea id='cm' rows='4'></textarea>
-<div class='err' id='cerr'></div><button class='btn' type='submit'>Send on WhatsApp</button></form></div></div></section>`;
+    return `<section><div class='wrap'><div class='split'><div><h1>Contact us</h1>
+<p class='muted'>Planning something special? Message either of our WhatsApp lines and we will reply within 24 hours.</p>
+${WA_LINES.map((l, i) => `<div class='row'><span>Line ${i + 1}</span><a href='tel:+${l.number}'>${l.display}</a></div>`).join('')}
+<div class='row'><span>Based in</span><span>Buea, Cameroon</span></div>
+<p>${this.buttons('Hello Host with the Most, I would like to make an enquiry.', 'Chat on')}</p></div>
+<form id='cf' class='card' novalidate><label for='cn'>Name</label><input id='cn' autocomplete='name'>
+<label for='cp'>Your phone / WhatsApp</label><input id='cp' type='tel' autocomplete='tel'>
+<label for='cl'>Send to</label><select id='cl'>${WA_LINES.map((l, i) => `<option value='${i}'>${l.display}</option>`).join('')}</select>
+<label for='cm'>Message</label><textarea id='cm' rows='4'></textarea>
+<div class='err' id='cerr'></div><button class='btn wa' type='submit'>Send on WhatsApp</button></form></div></div></section>`;
   }
   mount(el) {
     const f = el.querySelector('#cf');
     f.onsubmit = e => {
       e.preventDefault();
-      if (!f.cn.value.trim() || digits(f.cp.value).length < 8 || !f.cm.value.trim()) { el.querySelector('#cerr').textContent = 'Please fill in your name, a valid phone number and a message.'; return; }
-      const text = 'Hello Host with the Most, I am ' + f.cn.value.trim() + ' (' + f.cp.value.trim() + '). ' + f.cm.value.trim();
-      const link = waLink(text);
-      window.open(link, '_blank', 'noopener');
-      f.innerHTML = `<h3>Almost done ✓</h3><p class='muted'>WhatsApp should have opened with your message. If not, tap below.</p><a class='btn wa' href='${link}' target='_blank' rel='noopener'>Open WhatsApp</a>`;
+      const name = f.cn.value.trim(), phone = f.cp.value.trim(), msg = f.cm.value.trim();
+      if (!name || digits(phone).length < 8 || !msg) { el.querySelector('#cerr').textContent = 'Please fill in your name, a valid phone number and a message.'; return; }
+      const text = 'Hello Host with the Most, I am ' + name + ' (' + phone + '). ' + msg;
+      window.open(waLink(text, +f.cl.value), '_blank', 'noopener');
+      f.innerHTML = `<h3>Almost done \u2713</h3><p class='muted'>WhatsApp should have opened with your message. If not, tap a button below. You can also send it to our other line.</p>${this.buttons(text, 'Send to')}`;
     };
   }
 }
